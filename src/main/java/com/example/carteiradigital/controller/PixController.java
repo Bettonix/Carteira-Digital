@@ -1,21 +1,18 @@
 package com.example.carteiradigital.controller;
 
+import com.example.carteiradigital.dto.PixKeyResponseDTO;
 import com.example.carteiradigital.dto.PixResponseDTO;
 import com.example.carteiradigital.dto.PixTransferDTO;
-import com.example.carteiradigital.dto.UserResponseDTO;
 import com.example.carteiradigital.entity.PixKey;
 import com.example.carteiradigital.entity.User;
+import com.example.carteiradigital.exception.GlobalException;
 import com.example.carteiradigital.service.AuthService;
 import com.example.carteiradigital.service.JwtService;
 import com.example.carteiradigital.service.PixService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/pix")
@@ -32,33 +29,36 @@ public class PixController {
     }
 
     @PostMapping("/gerar-chave")
-    public ResponseEntity<Map<String, Object>> gerarChavePix(@RequestHeader("Authorization") String token) {
-
-
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PixKeyResponseDTO> gerarChavePix(@RequestHeader("Authorization") String token) {
         String email = jwtService.extractUsername(token.replace("Bearer ", ""));
-        Optional<User> user = authService.getUsuarioPorEmail(email);
+        User user = authService.getUsuarioPorEmail(email)
+                .orElseThrow(() -> new GlobalException("Usuário não encontrado!", HttpStatus.UNAUTHORIZED));
 
-            PixKey chavePix = pixService.gerarChavePix(user.get().getId());
+        PixKey chavePix = pixService.gerarChavePix(user.getId());
 
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("chave", chavePix.getChave());
-        response.put("tipo", "aleatória");
-        response.put("criacao", chavePix.getDataCriacao().toString());
-        response.put("expiracao", chavePix.getDataExpiracao().toString());
+        PixKeyResponseDTO response = new PixKeyResponseDTO(
+                chavePix.getChave(),
+                "aleatória",
+                chavePix.getDataCriacao(),
+                chavePix.getDataExpiracao()
+        );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     @PostMapping("/transferir")
-    public ResponseEntity<?> transferirPix(@RequestBody PixTransferDTO dto) {
-        try {
-            PixResponseDTO resposta = pixService.transferirPix(dto);
-            return ResponseEntity.ok(resposta);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("erro", e.getMessage()));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PixResponseDTO> transferirPix(@RequestHeader("Authorization") String token, @RequestBody PixTransferDTO dto) {
+        String email = jwtService.extractUsername(token.replace("Bearer ", ""));
+        User user = authService.getUsuarioPorEmail(email)
+                .orElseThrow(() -> new GlobalException("Usuário não encontrado!", HttpStatus.UNAUTHORIZED));
+
+        if (!user.getId().equals(dto.getOrigemId())) {
+            throw new GlobalException("Usuário não autorizado para esta transação!", HttpStatus.FORBIDDEN);
         }
+
+        PixResponseDTO resposta = pixService.transferirPix(dto);
+        return ResponseEntity.ok(resposta);
     }
-
-
 }
