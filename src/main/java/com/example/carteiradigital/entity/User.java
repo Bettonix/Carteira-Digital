@@ -1,7 +1,10 @@
 package com.example.carteiradigital.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "users")
@@ -20,7 +23,4 @@ public class User {
 
     @Column(nullable = false)
     private String senha;
-
-    public User(String email, String encode) {
-    }
 }
