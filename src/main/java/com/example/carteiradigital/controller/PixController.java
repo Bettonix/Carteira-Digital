@@ -9,6 +9,7 @@ import com.example.carteiradigital.exception.GlobalException;
 import com.example.carteiradigital.service.AuthService;
 import com.example.carteiradigital.service.JwtService;
 import com.example.carteiradigital.service.PixService;
+import com.example.carteiradigital.service.RateLimitingService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,11 +22,13 @@ public class PixController {
     private final PixService pixService;
     private final JwtService jwtService;
     private final AuthService authService;
+    private final RateLimitingService rateLimitingService;
 
-    public PixController(PixService pixService, JwtService jwtService, AuthService authService) {
+    public PixController(PixService pixService, JwtService jwtService, AuthService authService, RateLimitingService rateLimitingService) {
         this.pixService = pixService;
         this.jwtService = jwtService;
         this.authService = authService;
+        this.rateLimitingService = rateLimitingService;
     }
 
     @PostMapping("/gerar-chave")
@@ -53,6 +56,10 @@ public class PixController {
         String email = jwtService.extractUsername(token.replace("Bearer ", ""));
         User user = authService.getUsuarioPorEmail(email)
                 .orElseThrow(() -> new GlobalException("Usuário não encontrado!", HttpStatus.UNAUTHORIZED));
+
+        if (!rateLimitingService.podeRealizarPix(user.getId().toString())) {
+            throw new GlobalException("Muitas transações em pouco tempo, tente novamente mais tarde.", HttpStatus.TOO_MANY_REQUESTS);
+        }
 
         if (!user.getId().equals(dto.getOrigemId())) {
             throw new GlobalException("Usuário não autorizado para esta transação!", HttpStatus.FORBIDDEN);
