@@ -4,13 +4,14 @@ import com.example.carteiradigital.dto.AuthDTO;
 import com.example.carteiradigital.dto.LoginDTO;
 import com.example.carteiradigital.dto.UserResponseDTO;
 import com.example.carteiradigital.entity.User;
-import com.example.carteiradigital.repository.UserRepository;
+import com.example.carteiradigital.exception.GlobalException;
 import com.example.carteiradigital.service.AuthService;
 import com.example.carteiradigital.service.JwtService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.Optional;
 
 @RestController
@@ -18,21 +19,20 @@ import java.util.Optional;
 public class AuthController {
 
 
-        private final AuthService authService;
-        private final JwtService jwtService;
+    private final AuthService authService;
+    private final JwtService jwtService;
 
-        public AuthController(AuthService authService, JwtService jwtService) {
-            this.authService = authService;
-            this.jwtService = jwtService;
-        }
+    public AuthController(AuthService authService, JwtService jwtService) {
+        this.authService = authService;
+        this.jwtService = jwtService;
+    }
 
     @PostMapping("/cadastrar")
     public ResponseEntity<UserResponseDTO> cadastrar(@RequestBody AuthDTO dto) {
         String resultado = authService.cadastrarUsuario(dto);
 
         if (resultado.equals("Usuário já cadastrado!")) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(new UserResponseDTO(resultado));
+            throw new GlobalException(resultado, HttpStatus.CONFLICT);
         }
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -48,20 +48,16 @@ public class AuthController {
             return ResponseEntity.ok(new UserResponseDTO("Autenticado com sucesso!", token));
         }
 
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(new UserResponseDTO("Credenciais inválidas!"));
+        throw new GlobalException("Credenciais inválidas!", HttpStatus.UNAUTHORIZED);
     }
 
     @GetMapping("/perfil")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<UserResponseDTO> perfil(@RequestHeader("Authorization") String token) {
         String email = jwtService.extractUsername(token.replace("Bearer ", ""));
-
         Optional<User> user = authService.getUsuarioPorEmail(email);
-        if (user.isPresent()) {
-            return ResponseEntity.ok(new UserResponseDTO("Usuário encontrado!", email));
-        }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new UserResponseDTO("Usuário não encontrado!"));
+        return user.map(value -> ResponseEntity.ok(new UserResponseDTO("Usuário encontrado!", value.getEmail())))
+                .orElseThrow(() -> new GlobalException("Usuário não encontrado!", HttpStatus.NOT_FOUND));
     }
 }
