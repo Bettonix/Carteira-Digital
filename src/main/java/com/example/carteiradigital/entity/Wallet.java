@@ -1,7 +1,12 @@
 package com.example.carteiradigital.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "wallets")
@@ -19,10 +24,6 @@ public class Wallet {
     private Long userId;
 
     @Column(nullable = false)
-    private double saldo;
+    private BigDecimal saldo;
 
-    public Wallet(Long userId, double saldo) {
-        this.userId = userId;
-        this.saldo = saldo;
-    }
 }
